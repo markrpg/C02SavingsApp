@@ -54,6 +54,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private GoogleMap mMap;
     private String[] colors = {"#7fff7272", "#7f31c7c5", "#7fff8a00"};
 
+    //One kilometer is 205 grams of C02 at average car speed of 35km
+    private int oneKMC02 = 205;
+
     ArrayList<LatLng> locations = new ArrayList<LatLng>();
     LatLng origin;
     LatLng end;
@@ -206,6 +209,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onProviderDisabled(String provider) {
+
+    }
+
+    //Method to calculate c02 savings by distance walked
+    public double calculateC02Savings(double distanceTravelled)
+    {
+        //If distance is less than one kilometer
+        if(distanceTravelled < 1000)
+        {
+            return (distanceTravelled / 1000) * oneKMC02;
+        }
+        //If its more than one kilometer then calculate
+        else
+        {
+            return distanceTravelled * oneKMC02;
+        }
 
     }
 
