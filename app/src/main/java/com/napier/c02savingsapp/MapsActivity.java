@@ -25,7 +25,9 @@ import android.widget.Toast;
 import com.akexorcist.googledirection.DirectionCallback;
 import com.akexorcist.googledirection.GoogleDirection;
 import com.akexorcist.googledirection.constant.AvoidType;
+import com.akexorcist.googledirection.constant.TransportMode;
 import com.akexorcist.googledirection.model.Direction;
+import com.akexorcist.googledirection.model.Leg;
 import com.akexorcist.googledirection.model.Route;
 import com.akexorcist.googledirection.util.DirectionConverter;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -39,6 +41,7 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import org.w3c.dom.Document;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +60,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     ArrayList<LatLng> locations = new ArrayList<LatLng>();
     LatLng origin;
     LatLng end;
+    double totalDist = 0.0d;
+    double totalEm = 0.0d;
+
+    int accuracyCounter = 1;
+    LatLng nextPoint = null;
+
+    ArrayList<Route> routes = new ArrayList<Route>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,7 +87,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
 
         locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, 5000, 20, locationListener);
+                LocationManager.GPS_PROVIDER, 5000, 5, locationListener);
+
 
         setContentView(R.layout.main_layout);
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
@@ -111,6 +122,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .to(end)
                 .avoid(AvoidType.FERRIES)
                 .avoid(AvoidType.HIGHWAYS)
+                .transitMode(TransportMode.DRIVING)
                 .execute(new DirectionCallback() {
                     @Override
                     public void onDirectionSuccess(Direction direction, String rawBody) {
@@ -119,16 +131,38 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
                             mMap.clear();
-                            /*
                             for (int i = 0; i < direction.getRouteList().size(); i++) {
                                 Route route = direction.getRouteList().get(i);
                                 String color = colors[i % colors.length];
                                 ArrayList<LatLng> directionPositionList = route.getLegList().get(0).getDirectionPoint();
-                                mMap.addPolyline(DirectionConverter.createPolyline(getBaseContext(), directionPositionList, 5, Color.parseColor(color)));
+
+                                double d = 0.0d;
+
+                                LatLng prev = null;
+                                for(LatLng l : directionPositionList){
+                                    if(prev == null) {
+                                        prev = l;
+                                        continue;
+                                    }
+                                    d += CalculationByDistance(prev, l);
+                                    prev = l;
+                                }
+                                totalDist += d;
+
+                                ((TextView) findViewById(R.id.distanceWalkedNo)).setText(String.valueOf(totalDist));
+
+                                routes.add(route);
+                                for(Route r : routes) {
+                                    ArrayList<LatLng> positions = r.getLegList().get(0).getDirectionPoint();
+
+                                    mMap.addPolyline(DirectionConverter.createPolyline(getBaseContext(), positions, 5, Color.parseColor(color)));
+                                    //mMap.addMarker(new MarkerOptions().position(positions.get(0)).title(""));
+                                    //mMap.addMarker(new MarkerOptions().position(positions.get(positions.size()-1)).title(""));
+                                }
                             }
-                            */
 
 
+                            /*
                             PolylineOptions lineOptions = new PolylineOptions().width(3).color(
                                     Color.RED);
 
@@ -147,6 +181,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 double dist = CalculationByDistance(origin, end);
                                 ((TextView) findViewById(R.id.distanceWalkedNo)).setText(String.valueOf(dist));
                             }
+                            */
 
                         } else {
                             // Do something
@@ -165,6 +200,28 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onLocationChanged(Location loc) {
+
+        /*
+        if(loc.getAccuracy() < 50){
+            if(nextPoint == null){
+                nextPoint = new LatLng(loc.getLatitude(), loc.getLongitude());
+            }else{
+                nextPoint = new LatLng(nextPoint.latitude + loc.getLatitude(), nextPoint.longitude + loc.getLongitude());
+                accuracyCounter++;
+            }
+            if(accuracyCounter < 3) {
+                return;
+            }
+        }
+        if(nextPoint != null){
+            loc.setLatitude(nextPoint.latitude/(accuracyCounter-1));
+            loc.setLongitude(nextPoint.longitude/(accuracyCounter-1));
+        }
+        Log.i("TESTTESTTEST", loc.getLatitude()+", "+loc.getLongitude());
+        nextPoint = null;
+        accuracyCounter = 1;
+        */
+
         /*------- To get city name from coordinates -------- */
         String cityName = null;
         Geocoder gcd = new Geocoder(getBaseContext(), Locale.getDefault());
@@ -180,16 +237,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         catch (IOException e) {
             e.printStackTrace();
         }
+
         LatLng newLoc = new LatLng(loc.getLatitude(), loc.getLongitude());
         if(origin == null){
             origin = newLoc;
             mMap.moveCamera(CameraUpdateFactory.newLatLng(origin));
             mMap.animateCamera(CameraUpdateFactory.zoomTo(15), 2000, null);
         }
+        if(locations.size() >= 2)
+            origin = locations.get(locations.size()-2);
+
         locations.add(newLoc);
         end = locations.get(locations.size()-1);
 
-        Toast.makeText(MapsActivity.this, end.latitude +", "+ end.longitude, Toast.LENGTH_SHORT).show();
+        Toast.makeText(MapsActivity.this, "New Location", Toast.LENGTH_SHORT).show();
 
         updateMap();
     }
@@ -229,8 +290,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         int kmInDec = Integer.valueOf(newFormat.format(km));
         double meter = valueResult % 1000;
         int meterInDec = Integer.valueOf(newFormat.format(meter));
-        Log.i("Radius Value", "" + valueResult + "   KM  " + kmInDec
-                + " Meter   " + meterInDec);
+        //Log.i("Radius Value", "" + valueResult + "   KM  " + kmInDec
+        //         + " Meter   " + meterInDec);
 
         return Radius * c;
     }
