@@ -1,6 +1,7 @@
 package com.napier.c02savingsapp;
 
 import android.app.AlertDialog;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -17,6 +18,7 @@ import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
@@ -90,7 +92,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
 
         locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, 5000, 5, locationListener);
+                LocationManager.GPS_PROVIDER, 5000, 10, locationListener);
 
 
         setContentView(R.layout.main_layout);
@@ -164,6 +166,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 }
                             }
 
+                            String c02Savings = String.valueOf(Math.round(calculateC02Savings(totalDist)*100.0d)/100.0d) +"g";
+                            ((TextView) findViewById(R.id.distanceWalkedNo)).setText(String.valueOf(Math.round(totalDist*100.0d)/100.0d) +"km");
+                            ((TextView) findViewById(R.id.savingsNo)).setText(c02Savings);
+
+
+                            NotificationCompat.Builder mBuilder =
+                                    new NotificationCompat.Builder(getBaseContext())
+                                            .setSmallIcon(R.mipmap.logo)
+                                            .setContentTitle("C02 Savings")
+                                            .setContentText(c02Savings);
+
+                            int mNotificationId = 001;
+                            NotificationManager mNotifyMgr =
+                                    (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                            mNotifyMgr.notify(mNotificationId, mBuilder.build());
 
                             /*
                             PolylineOptions lineOptions = new PolylineOptions().width(3).color(
@@ -186,6 +203,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             }
                             */
 
+
                         } else {
                             // Do something
                             Toast.makeText(MapsActivity.this, "Directions are not 'OK'.", Toast.LENGTH_SHORT).show();
@@ -200,6 +218,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 });
 
     }
+
 
     @Override
     public void onLocationChanged(Location loc) {
@@ -274,19 +293,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //Method to calculate c02 savings by distance walked
-    public double calculateC02Savings(double distanceTravelled)
-    {
-        //If distance is less than one kilometer
-        if(distanceTravelled < 1000)
-        {
-            return (distanceTravelled / 1000) * oneKMC02;
-        }
-        //If its more than one kilometer then calculate
-        else
-        {
-            return distanceTravelled * oneKMC02;
-        }
-
+    public double calculateC02Savings(double distanceTravelled){
+        return distanceTravelled * oneKMC02;
     }
 
     // Distance in km for a straight line
