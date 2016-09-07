@@ -1,11 +1,13 @@
 package com.napier.c02savingsapp;
 
 import android.app.AlertDialog;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
@@ -17,6 +19,7 @@ import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
@@ -34,6 +37,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
@@ -55,7 +59,7 @@ import java.util.Locale;
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, LocationListener {
 
     private GoogleMap mMap;
-    private String[] colors = {"#7fff7272", "#7f31c7c5", "#7fff8a00"};
+    private String[] colors = {"#FF0000", "#7f31c7c5", "#7fff8a00"};
 
     //One kilometer is 205 grams of C02 at average car speed of 35km
     private int oneKMC02 = 205;
@@ -67,7 +71,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     double totalEm = 0.0d;
 
     int accuracyCounter = 1;
-    LatLng nextPoint = null;
+
+    boolean isAveraging = false;
+    double latitude = 0.0d;
+    double longitude = 0.0d;
 
     ArrayList<Route> routes = new ArrayList<Route>();
 
@@ -90,7 +97,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
 
         locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, 5000, 5, locationListener);
+                LocationManager.GPS_PROVIDER, 1000, 10, locationListener);
 
 
         setContentView(R.layout.main_layout);
@@ -112,6 +119,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
+        mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+        mMap.setBuildingsEnabled(true);
+
         updateMap();
     }
 
@@ -134,6 +144,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
                             mMap.clear();
+
+
                             for (int i = 0; i < direction.getRouteList().size(); i++) {
                                 Route route = direction.getRouteList().get(i);
                                 String color = colors[i % colors.length];
@@ -150,11 +162,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     d += CalculationByDistance(prev, l);
                                     prev = l;
                                 }
-                                totalDist += d;
 
-                                ((TextView) findViewById(R.id.distanceWalkedNo)).setText(String.valueOf(totalDist));
+                                if(d >= 0.02d){
+                                    totalDist += d;
+                                    ((TextView) findViewById(R.id.distanceWalkedNo)).setText(String.valueOf(totalDist));
+                                    routes.add(route);
+                                }else{
+                                    locations.remove(end);
+                                    end = null;
+                                    //Toast.makeText(MapsActivity.this, "Removed: "+ d, Toast.LENGTH_SHORT).show();
+                                }
 
-                                routes.add(route);
                                 for(Route r : routes) {
                                     ArrayList<LatLng> positions = r.getLegList().get(0).getDirectionPoint();
 
@@ -164,6 +182,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 }
                             }
 
+                            String c02Savings = String.valueOf(Math.round(calculateC02Savings(totalDist)*100.0d)/100.0d) +"g";
+                            ((TextView) findViewById(R.id.distanceWalkedNo)).setText(String.valueOf(Math.round(totalDist*100.0d)/100.0d) +"km");
+                            ((TextView) findViewById(R.id.savingsNo)).setText(c02Savings);
+
+
+                            NotificationCompat.Builder mBuilder =
+                                    new NotificationCompat.Builder(getBaseContext())
+                                            .setSmallIcon(R.mipmap.logo)
+                                            .setContentTitle("C02 Savings")
+                                            .setContentText(c02Savings);
+
+                            int mNotificationId = 001;
+                            NotificationManager mNotifyMgr =
+                                    (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                            mNotifyMgr.notify(mNotificationId, mBuilder.build());
 
                             /*
                             PolylineOptions lineOptions = new PolylineOptions().width(3).color(
@@ -186,42 +219,52 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             }
                             */
 
+
                         } else {
                             // Do something
-                            Toast.makeText(MapsActivity.this, "Directions are not 'OK'.", Toast.LENGTH_SHORT).show();
+                            //Toast.makeText(MapsActivity.this, "Directions are not 'OK'.", Toast.LENGTH_SHORT).show();
                         }
                     }
 
                     @Override
                     public void onDirectionFailure(Throwable t) {
                         // Do something
-                        Toast.makeText(MapsActivity.this, "No directions.", Toast.LENGTH_SHORT).show();
+                        //Toast.makeText(MapsActivity.this, "No directions.", Toast.LENGTH_SHORT).show();
                     }
                 });
 
     }
+
 
     @Override
     public void onLocationChanged(Location loc) {
 
         /*
         if(loc.getAccuracy() < 50){
-            if(nextPoint == null){
-                nextPoint = new LatLng(loc.getLatitude(), loc.getLongitude());
+            if(!isAveraging){
+                latitude = loc.getLatitude();
+                longitude = loc.getLongitude();
+                isAveraging = true;
             }else{
-                nextPoint = new LatLng(nextPoint.latitude + loc.getLatitude(), nextPoint.longitude + loc.getLongitude());
+                latitude += loc.getLatitude();
+                longitude += loc.getLongitude();
                 accuracyCounter++;
             }
+            Toast.makeText(this, "avg", Toast.LENGTH_SHORT).show();
             if(accuracyCounter < 3) {
                 return;
             }
         }
-        if(nextPoint != null){
-            loc.setLatitude(nextPoint.latitude/(accuracyCounter-1));
-            loc.setLongitude(nextPoint.longitude/(accuracyCounter-1));
+        if(isAveraging && !(loc.getAccuracy() < 50)){
+            loc.setLatitude(latitude/accuracyCounter);
+            loc.setLongitude(longitude/accuracyCounter);
         }
-        Log.i("TESTTESTTEST", loc.getLatitude()+", "+loc.getLongitude());
-        nextPoint = null;
+        Toast.makeText(this, "Loc"+ loc.getLatitude()+", "+loc.getLongitude(), Toast.LENGTH_LONG).show();
+        //Log.i("TESTTESTTEST", loc.getLatitude()+", "+loc.getLongitude());
+
+        latitude = 0.0d;
+        longitude = 0.0d;
+        isAveraging = false;
         accuracyCounter = 1;
         */
 
@@ -244,14 +287,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         LatLng newLoc = new LatLng(loc.getLatitude(), loc.getLongitude());
         if(origin == null){
             origin = newLoc;
-            mMap.moveCamera(CameraUpdateFactory.newLatLng(origin));
-            mMap.animateCamera(CameraUpdateFactory.zoomTo(15), 2000, null);
         }
+
         if(locations.size() >= 2)
             origin = locations.get(locations.size()-2);
 
         locations.add(newLoc);
         end = locations.get(locations.size()-1);
+
+        //mMap.moveCamera(CameraUpdateFactory.newLatLng(end));
+        //mMap.animateCamera(CameraUpdateFactory.zoomTo(15), 2000, null);
+
+        CameraPosition cameraPosition = new CameraPosition.Builder()
+                .target(end) // Sets the center of the map to
+                .zoom(15)                   // Sets the zoom
+                .tilt(30)    // Sets the tilt of the camera to 30 degrees
+                .build();    // Creates a CameraPosition from the builder
+        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(
+                cameraPosition));
+
+
 
         Toast.makeText(MapsActivity.this, "New Location", Toast.LENGTH_SHORT).show();
 
@@ -265,7 +320,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onProviderEnabled(String provider) {
-
     }
 
     @Override
@@ -274,19 +328,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //Method to calculate c02 savings by distance walked
-    public double calculateC02Savings(double distanceTravelled)
-    {
-        //If distance is less than one kilometer
-        if(distanceTravelled < 1000)
-        {
-            return (distanceTravelled / 1000) * oneKMC02;
-        }
-        //If its more than one kilometer then calculate
-        else
-        {
-            return distanceTravelled * oneKMC02;
-        }
-
+    public double calculateC02Savings(double distanceTravelled){
+        return distanceTravelled * oneKMC02;
     }
 
     // Distance in km for a straight line
