@@ -12,40 +12,55 @@
         android:layout_width="match_parent"
         android:layout_height="261dp"
         tools:context="com.napier.c02savingsapp.MapsActivity"
-        android:layout_weight="0.72" />
+        android:layout_weight="1.00" />
 
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:background="@drawable/border">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Current Savings:"
-            android:id="@+id/savings" />
+            android:id="@+id/savings"
+            android:layout_centerHorizontal="true" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_toRightOf="@id/savings"
             android:text="0"
-            android:id="@+id/savingsNo" />
+            android:id="@+id/savingsNo"
+            android:layout_below="@id/savings"
+            android:layout_centerHorizontal="true" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_below="@id/savingsNo"
             android:text="@string/distanceWalked"
-            android:id="@+id/distanceWalked"/>
+            android:id="@+id/distanceWalked"
+            android:layout_centerHorizontal="true" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="0"
             android:id="@+id/distanceWalkedNo"
-            android:layout_below="@+id/savingsNo"
-            android:layout_toRightOf="@+id/savingsNo"
-            android:layout_toEndOf="@+id/savingsNo" />
+            android:layout_below="@+id/distanceWalked"
+            android:layout_weight="0.72"
+            android:layout_centerHorizontal="true" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/ShareButton"
+            android:layout_centerVertical="true"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
+            android:padding="8dp"
+            android:layout_margin="4dp" />
+
 
 
     </RelativeLayout>

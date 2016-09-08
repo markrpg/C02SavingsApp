@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,6 +38,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -59,7 +61,7 @@ import java.util.Locale;
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, LocationListener {
 
     private GoogleMap mMap;
-    private String[] colors = {"#FF0000", "#7f31c7c5", "#7fff8a00"};
+    private String[] colors = {"#996633", "#7f31c7c5", "#7fff8a00"};
 
     //One kilometer is 205 grams of C02 at average car speed of 35km
     private int oneKMC02 = 205;
@@ -105,6 +107,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+
+        ((Button)findViewById(R.id.ShareButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String message = "I have saved "+ String.valueOf(Math.round(calculateC02Savings(totalDist)*100.0d)/100.0d) +"g of C02 today by walking!!";
+                Intent share = new Intent(Intent.ACTION_SEND);
+                share.setType("text/plain");
+                share.putExtra(Intent.EXTRA_TEXT, message);
+
+                startActivity(Intent.createChooser(share, "Title of the dialog the system will open"));
+            }
+        });
+        ((Button)findViewById(R.id.ShareButton)).setBackgroundResource(R.drawable.share);
     }
 
     /**
@@ -119,7 +135,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-        mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+        mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
         mMap.setBuildingsEnabled(true);
 
         updateMap();
@@ -197,6 +213,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             NotificationManager mNotifyMgr =
                                     (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                             mNotifyMgr.notify(mNotificationId, mBuilder.build());
+
+
+                            if(end != null) {
+                                mMap.addMarker(new MarkerOptions()
+                                        .position(end)
+                                        .title("You")
+                                        .snippet("Saved "+ c02Savings)
+                                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.scarylady)));
+                            }else if(origin != null){
+                                mMap.addMarker(new MarkerOptions()
+                                        .position(origin)
+                                        .title("You")
+                                        .snippet("Saved "+ c02Savings)
+                                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.scarylady)));
+                            }
 
                             /*
                             PolylineOptions lineOptions = new PolylineOptions().width(3).color(
